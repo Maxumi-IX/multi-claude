@@ -1,0 +1,179 @@
+<!doctype html>
+<html>
+  <head>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- custom titlebar -->
+    <div id="titlebar">
+      <div class="drag-region">
+        <img class="titlebar-icon" src="../../public/app-icon.png" alt="" />
+        <span>Multi Claude Desktop</span>
+      </div>
+
+      <div class="controls-container">
+        <!-- profile switcher dropdown -->
+        <div class="relative">
+          <button id="profile-btn" class="no-drag">
+            <span id="current-profile">Default</span>
+            <span class="chevron">▼</span>
+          </button>
+          <div id="profile-popup" class="popup hidden">
+            <div id="profile-list"></div>
+          </div>
+        </div>
+
+        <div class="window-controls no-drag">
+          <button id="settings-btn"><span class="cog-icon">⚙️</span></button>
+          <button id="min-btn">&minus;</button>
+          <button id="max-btn">&#9744;</button>
+          <button id="close-btn" class="close-hover">&#10005;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- settings modal: profiles tab + about tab -->
+    <div id="settings-modal" class="modal hidden no-drag">
+      <div class="modal-content settings-modal-content">
+        <div class="modal-header">
+          <h3>Settings</h3>
+          <button id="close-modal-btn" class="icon-btn">&#10005;</button>
+        </div>
+
+        <div class="settings-body">
+          <nav class="settings-tabs" id="settings-tabs">
+            <button class="tab-btn active" data-tab="profiles" type="button">
+              <span class="tab-icon">&#9635;</span>
+              <span>Profiles</span>
+            </button>
+            <button class="tab-btn" data-tab="about" type="button">
+              <span class="tab-icon">&#9432;</span>
+              <span>About</span>
+            </button>
+          </nav>
+
+          <div class="settings-panels">
+            <section id="tab-profiles" class="tab-panel active">
+              <!-- sub-nav: list of existing profiles vs the add/edit form -->
+              <nav class="profile-subtabs" id="profile-subtabs">
+                <button
+                  class="subtab-btn active"
+                  data-subtab="list"
+                  type="button"
+                >
+                  All Profiles
+                </button>
+                <button
+                  class="subtab-btn"
+                  data-subtab="edit"
+                  type="button"
+                  id="subtab-edit-btn"
+                >
+                  Add New
+                </button>
+              </nav>
+
+              <div id="subtab-list" class="subtab-panel active">
+                <div id="settings-profile-list" class="settings-list"></div>
+              </div>
+
+              <!-- same form gets reused for both create and edit, see renderer.js -->
+              <div id="subtab-edit" class="subtab-panel">
+                <h4 id="profile-form-heading" class="section-title">
+                  New profile
+                </h4>
+
+                <div class="avatar-picker" id="avatar-picker">
+                  <div class="avatar-picker-circle" id="avatar-picker-circle">
+                    <span id="avatar-picker-initial">?</span>
+                    <span class="plus-icon" aria-hidden="true"></span>
+                    <div class="avatar-picker-overlay">Change</div>
+                  </div>
+                  <input
+                    type="file"
+                    id="avatar-file-input"
+                    accept="image/*"
+                    hidden
+                  />
+                </div>
+
+                <label class="field-label" for="profile-form-name">Name</label>
+                <input
+                  type="text"
+                  id="profile-form-name"
+                  class="styled-input"
+                  placeholder="Profile name..."
+                />
+
+                <div class="edit-actions">
+                  <button
+                    id="profile-form-cancel"
+                    class="secondary-btn"
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="profile-form-save"
+                    class="primary-btn"
+                    type="button"
+                  >
+                    Create profile
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section id="tab-about" class="tab-panel">
+              <div class="about-panel">
+                <img
+                  class="app-mark"
+                  src="../../public/app-icon.png"
+                  alt="App icon"
+                />
+                <h4 class="about-title">Multi Claude Desktop</h4>
+                <p class="about-version">Version 1.0.0</p>
+                <p class="about-desc">
+                  Run multiple isolated Claude sessions side by side, each with
+                  its own signed-in account and storage partition.
+                </p>
+                <div class="maker-credit">
+                  <img
+                    class="maker-badge"
+                    src="https://avatars.githubusercontent.com/u/121119545?v=4"
+                    alt="Maxumi-IX avatar"
+                  />
+                  <span class="maker-text"
+                    >Crafted by <strong>Maxumi-IX</strong></span
+                  >
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- generic yes/no confirm popup, used for delete profile right now -->
+    <div id="confirm-modal" class="modal hidden no-drag" style="z-index: 300">
+      <div class="modal-content" style="width: 300px; text-align: center">
+        <h3 style="margin-top: 0">Are you sure?</h3>
+        <p
+          id="confirm-message"
+          style="color: #bbb; margin-bottom: 20px; font-size: 14px"
+        ></p>
+        <div style="display: flex; gap: 10px; justify-content: center">
+          <button id="confirm-cancel-btn" class="secondary-btn">Cancel</button>
+          <button id="confirm-yes-btn" class="danger-btn">
+            Delete Profile
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- active profile's webview gets mounted in here -->
+    <div id="webview-container"></div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
