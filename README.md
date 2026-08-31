@@ -44,9 +44,12 @@ While the official Claude app is great, it doesn't support multiple profiles. If
 
 Grab the latest release for your platform from [**Releases**](https://github.com/Maxumi-IX/multi-claude/releases):
 
-| Platform | File             |
-| -------- | ---------------- |
-| Windows  | `.exe` installer |
+| Platform | File                        |
+| -------- | --------------------------- |
+| Windows  | `.exe` installer            |
+| Debian   | `.deb` package              |
+| Arch     | `.pacman` package           |
+| AppImage | `.AppImage`                 |
 
 ### First Launch
 
@@ -58,19 +61,19 @@ Grab the latest release for your platform from [**Releases**](https://github.com
 
 ## Tech Stack
 
-| Layer     | Technology                                             |
-| --------- | ------------------------------------------------------ |
-| Backend   | [Electron](https://www.electronjs.org/) (Node.js)      |
-| Frontend  | HTML, CSS, Vanilla JavaScript                          |
-| Packaging | [electron-builder](https://www.electron.build/) (NSIS) |
+| Layer     | Technology                                                                    |
+| --------- | ----------------------------------------------------------------------------- |
+| Backend   | [Electron](https://www.electronjs.org/) (Node.js, TypeScript)                 |
+| Frontend  | HTML, CSS, TypeScript                                                         |
+| Packaging | [electron-builder](https://www.electron.build/) (NSIS, deb, pacman, AppImage) |
 
 ## Development
 
-You can build the latest release directly from the source code. The app is packaged as a silent, one-click Windows installer.
+You can build the latest release directly from the source code. The app is packaged as a silent, one-click Windows installer, or as a `.deb`, `.pacman`, or `.AppImage` on Linux.
 
 1. Clone or download this repository.
-2. Follow the **Development** steps below to build the `.exe` file.
-3. Run the installer generated in the `dist/` folder.
+2. Follow the **Development** steps below to build.
+3. Run the installer (or, on Linux, the package/AppImage) generated in the `release/` folder.
 
 ### Prerequisites
 
@@ -91,6 +94,15 @@ npm start
 
 # Build the Windows .exe installer
 npm run build
+
+# Build the Linux .AppImage
+npm run build:linux
+
+# Build the Linux .deb package (Debian/Ubuntu)
+npm run build:deb
+
+# Build the Linux .pacman package (Arch)
+npm run build:arch
 ```
 
 > [!NOTE]
