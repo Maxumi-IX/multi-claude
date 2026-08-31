@@ -1,33 +1,48 @@
-document.getElementById("min-btn").onclick = () =>
+// Profile and window.electronAPI come from src/renderer/global.d.ts, which
+// is included in this compilation (see tsconfig.renderer.json) as an
+// ambient global script - no import needed, and none is possible here
+// without reintroducing the CommonJS "exports" boilerplate that breaks this
+// file as a <script> tag.
+
+// Small helper so we fail loudly (at startup) instead of with a vague
+// "possibly null" error somewhere deep in a click handler.
+function requireEl<T extends HTMLElement>(id: string): T {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`Missing #${id} element in index.html`);
+  return el as T;
+}
+
+document.getElementById("min-btn")!.onclick = () =>
   window.electronAPI.minimize();
-document.getElementById("max-btn").onclick = () =>
+document.getElementById("max-btn")!.onclick = () =>
   window.electronAPI.maximize();
-document.getElementById("close-btn").onclick = () => window.electronAPI.close();
+document.getElementById("close-btn")!.onclick = () =>
+  window.electronAPI.close();
 
-const profileBtn = document.getElementById("profile-btn");
-const profilePopup = document.getElementById("profile-popup");
-const profileList = document.getElementById("profile-list");
-const currentProfileLabel = document.getElementById("current-profile");
+const profileBtn = requireEl<HTMLButtonElement>("profile-btn");
+const profilePopup = requireEl<HTMLDivElement>("profile-popup");
+const profileList = requireEl<HTMLDivElement>("profile-list");
+const currentProfileLabel = requireEl<HTMLSpanElement>("current-profile");
 
-const settingsBtn = document.getElementById("settings-btn");
-const settingsModal = document.getElementById("settings-modal");
-const closeModalBtn = document.getElementById("close-modal-btn");
-const settingsProfileList = document.getElementById("settings-profile-list");
+const settingsBtn = requireEl<HTMLButtonElement>("settings-btn");
+const settingsModal = requireEl<HTMLDivElement>("settings-modal");
+const closeModalBtn = requireEl<HTMLButtonElement>("close-modal-btn");
+const settingsProfileList = requireEl<HTMLDivElement>("settings-profile-list");
 
-const profileFormHeading = document.getElementById("profile-form-heading");
-const profileFormName = document.getElementById("profile-form-name");
-const profileFormSave = document.getElementById("profile-form-save");
-const profileFormCancel = document.getElementById("profile-form-cancel");
-const avatarPickerCircle = document.getElementById("avatar-picker-circle");
-const avatarPickerInitial = document.getElementById("avatar-picker-initial");
-const avatarFileInput = document.getElementById("avatar-file-input");
+const profileFormHeading = requireEl<HTMLElement>("profile-form-heading");
+const profileFormName = requireEl<HTMLInputElement>("profile-form-name");
+const profileFormSave = requireEl<HTMLButtonElement>("profile-form-save");
+const profileFormCancel = requireEl<HTMLButtonElement>("profile-form-cancel");
+const avatarPickerCircle = requireEl<HTMLDivElement>("avatar-picker-circle");
+const avatarPickerInitial = requireEl<HTMLElement>("avatar-picker-initial");
+const avatarFileInput = requireEl<HTMLInputElement>("avatar-file-input");
 
-const webviewContainer = document.getElementById("webview-container");
-let activeProfileId = null;
+const webviewContainer = requireEl<HTMLDivElement>("webview-container");
+let activeProfileId: string | null = null;
 
 // null = we're creating a new profile, otherwise holds the id being edited
-let editingProfileId = null;
-let pendingAvatarDataUrl = null;
+let editingProfileId: string | null = null;
+let pendingAvatarDataUrl: string | null = null;
 
 profileBtn.onclick = () => {
   profilePopup.classList.toggle("hidden");
@@ -37,8 +52,8 @@ profileBtn.onclick = () => {
 // close the profile popup if you click anywhere outside it
 document.addEventListener("click", (event) => {
   if (
-    !profileBtn.contains(event.target) &&
-    !profilePopup.contains(event.target)
+    !profileBtn.contains(event.target as Node) &&
+    !profilePopup.contains(event.target as Node)
   ) {
     profilePopup.classList.add("hidden");
     profileBtn.classList.remove("open");
@@ -58,7 +73,7 @@ settingsBtn.onclick = () => {
 closeModalBtn.onclick = () => settingsModal.classList.add("hidden");
 
 // top-level settings tabs (profiles / about)
-document.querySelectorAll(".tab-btn").forEach((btn) => {
+document.querySelectorAll<HTMLButtonElement>(".tab-btn").forEach((btn) => {
   btn.onclick = () => {
     document
       .querySelectorAll(".tab-btn")
@@ -68,36 +83,36 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
       .forEach((p) => p.classList.remove("active"));
 
     btn.classList.add("active");
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+    document.getElementById(`tab-${btn.dataset.tab}`)!.classList.add("active");
   };
 });
 
-function switchProfileSubtab(name) {
+function switchProfileSubtab(name: string): void {
   document
-    .querySelectorAll(".subtab-btn")
+    .querySelectorAll<HTMLButtonElement>(".subtab-btn")
     .forEach((b) => b.classList.toggle("active", b.dataset.subtab === name));
   document
     .querySelectorAll(".subtab-panel")
     .forEach((p) => p.classList.toggle("active", p.id === `subtab-${name}`));
 }
 
-document.querySelectorAll(".subtab-btn").forEach((btn) => {
+document.querySelectorAll<HTMLButtonElement>(".subtab-btn").forEach((btn) => {
   btn.onclick = () => {
     // clicking "Add New" while not already editing something should reset the form
     if (btn.dataset.subtab === "edit" && editingProfileId === null) {
       resetProfileForm();
     }
-    switchProfileSubtab(btn.dataset.subtab);
+    switchProfileSubtab(btn.dataset.subtab!);
   };
 });
 
 // fallback avatar look for profiles without a picture - colored circle + first letter
-function getAvatarProps(name) {
+function getAvatarProps(name: string): { color: string; initial: string } {
   const initial = name.trim().charAt(0).toUpperCase() || "?";
   return { color: "#da7756", initial };
 }
 
-function avatarHtml(profile, sizeClass = "profile-avatar") {
+function avatarHtml(profile: Profile, sizeClass = "profile-avatar"): string {
   if (profile.avatar) {
     return `<img class="${sizeClass}" src="${profile.avatar}" alt="" />`;
   }
@@ -107,7 +122,7 @@ function avatarHtml(profile, sizeClass = "profile-avatar") {
 
 // resize/crop whatever image the user picked down to a small square jpeg
 // so we're not stuffing huge base64 blobs into profiles.json
-function fileToAvatarDataUrl(file) {
+function fileToAvatarDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(reader.error);
@@ -119,7 +134,7 @@ function fileToAvatarDataUrl(file) {
         const canvas = document.createElement("canvas");
         canvas.width = size;
         canvas.height = size;
-        const ctx = canvas.getContext("2d");
+        const ctx = canvas.getContext("2d")!;
 
         // scale to cover then center-crop, like object-fit: cover
         const scale = Math.max(size / img.width, size / img.height);
@@ -129,14 +144,14 @@ function fileToAvatarDataUrl(file) {
 
         resolve(canvas.toDataURL("image/jpeg", 0.85));
       };
-      img.src = reader.result;
+      img.src = reader.result as string;
     };
     reader.readAsDataURL(file);
   });
 }
 
 // updates the little avatar circle in the add/edit form based on current state
-function renderAvatarPicker() {
+function renderAvatarPicker(): void {
   const rawName = profileFormName.value.trim();
 
   if (pendingAvatarDataUrl) {
@@ -163,7 +178,7 @@ function renderAvatarPicker() {
 
 avatarPickerCircle.onclick = () => avatarFileInput.click();
 avatarFileInput.onchange = async () => {
-  const file = avatarFileInput.files[0];
+  const file = avatarFileInput.files?.[0];
   if (!file) return;
   pendingAvatarDataUrl = await fileToAvatarDataUrl(file);
   renderAvatarPicker();
@@ -171,7 +186,7 @@ avatarFileInput.onchange = async () => {
 };
 profileFormName.addEventListener("input", renderAvatarPicker);
 
-function resetProfileForm() {
+function resetProfileForm(): void {
   editingProfileId = null;
   pendingAvatarDataUrl = null;
   profileFormName.value = "";
@@ -180,7 +195,7 @@ function resetProfileForm() {
   renderAvatarPicker();
 }
 
-function openProfileForm(profile) {
+function openProfileForm(profile: Profile): void {
   editingProfileId = profile.id;
   pendingAvatarDataUrl = profile.avatar || null;
   profileFormName.value = profile.name;
@@ -233,7 +248,7 @@ profileFormName.addEventListener("keypress", (e) => {
 });
 
 // swaps out the webview for the given profile's session/partition
-function mountWebview(profileId, profileName) {
+function mountWebview(profileId: string, profileName: string): void {
   if (activeProfileId === profileId) return; // already on this one, nothing to do
 
   webviewContainer.innerHTML = "";
@@ -250,7 +265,7 @@ function mountWebview(profileId, profileName) {
   localStorage.setItem("lastActiveProfileId", profileId);
 
   // update the checkmark on whichever profile is active in the dropdown
-  document.querySelectorAll(".popup-item").forEach((item) => {
+  document.querySelectorAll<HTMLElement>(".popup-item").forEach((item) => {
     if (item.dataset.id === profileId) {
       item.classList.add("active-item");
     } else {
@@ -260,18 +275,18 @@ function mountWebview(profileId, profileName) {
 }
 
 // promise-based confirm dialog since we can't use the native confirm() with a frameless window
-function showCustomConfirm(message) {
+function showCustomConfirm(message: string): Promise<boolean> {
   return new Promise((resolve) => {
-    document.getElementById("confirm-message").textContent = message;
-    document.getElementById("confirm-modal").classList.remove("hidden");
+    requireEl<HTMLElement>("confirm-message").textContent = message;
+    requireEl<HTMLElement>("confirm-modal").classList.remove("hidden");
 
-    const yesBtn = document.getElementById("confirm-yes-btn");
-    const cancelBtn = document.getElementById("confirm-cancel-btn");
+    const yesBtn = requireEl<HTMLButtonElement>("confirm-yes-btn");
+    const cancelBtn = requireEl<HTMLButtonElement>("confirm-cancel-btn");
 
     const cleanup = () => {
       yesBtn.onclick = null;
       cancelBtn.onclick = null;
-      document.getElementById("confirm-modal").classList.add("hidden");
+      requireEl<HTMLElement>("confirm-modal").classList.add("hidden");
     };
 
     yesBtn.onclick = () => {
@@ -285,7 +300,7 @@ function showCustomConfirm(message) {
   });
 }
 
-async function loadProfiles() {
+async function loadProfiles(): Promise<void> {
   const profiles = await window.electronAPI.getProfiles();
 
   profileList.innerHTML = "";
@@ -344,7 +359,7 @@ async function loadProfiles() {
             // if you delete the profile you're currently on, bounce back to Default
             const defaultProfile = profiles.find(
               (prof) => prof.id === "Default",
-            );
+            )!;
             mountWebview("Default", defaultProfile.name);
           }
           await loadProfiles();

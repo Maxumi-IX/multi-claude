@@ -1,0 +1,13 @@
+{
+  // Config for the main process and preload bridge: these run inside real
+  // Node.js (Electron's main process / a preload script with nodeIntegration
+  // for that context), so they compile to CommonJS as normal.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "node16",
+    "moduleResolution": "node16",
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/main/**/*.ts", "src/shared/**/*.ts"]
+}
