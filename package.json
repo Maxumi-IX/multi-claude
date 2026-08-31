@@ -1,22 +1,40 @@
 {
   "name": "multi-claude-desktop",
-  "author": "Maxumi",
+  "author": {
+    "name": "Maxumi",
+    "email": "121119545+Maxumi-IX@users.noreply.github.com"
+  },
   "description": "Desktop client for Claude AI",
-  "version": "1.0.0",
-  "main": "src/main/main.js",
+  "version": "1.0.1",
+  "homepage": "https://github.com/Maxumi-IX/multi-claude",
+  "main": "dist/main/main.js",
   "scripts": {
-    "start": "electron .",
-    "build": "electron-builder --win"
+    "compile": "tsc -p tsconfig.main.json && tsc -p tsconfig.renderer.json",
+    "copy-assets": "node scripts/copy-assets.js",
+    "prepare-dist": "npm run compile && npm run copy-assets",
+    "start": "npm run prepare-dist && electron .",
+    "build": "npm run prepare-dist && electron-builder --win",
+    "build:linux": "npm run prepare-dist && electron-builder --linux AppImage",
+    "build:arch": "npm run prepare-dist && electron-builder --linux pacman",
+    "build:deb": "npm run prepare-dist && electron-builder --linux deb"
   },
   "build": {
     "appId": "com.maxumi.multiclaude",
     "productName": "Multi Claude Desktop",
+    "artifactName": "${name}-${version}-setup.${ext}",
     "directories": {
-      "output": "dist"
+      "output": "release"
     },
+    "files": ["dist/**/*", "public/**/*", "package.json"],
     "win": {
       "target": "nsis",
       "icon": "public/icon.ico"
+    },
+    "linux": {
+      "target": ["pacman", "deb", "AppImage"],
+      "icon": "public/icons",
+      "category": "Network",
+      "maintainer": "Maxumi <121119545+Maxumi-IX@users.noreply.github.com>"
     },
     "nsis": {
       "oneClick": true,
@@ -27,10 +45,18 @@
       "runAfterFinish": true,
       "installerIcon": "public/icon.ico",
       "uninstallerIcon": "public/icon.ico"
+    },
+    "pacman": {
+      "depends": ["gtk3", "libnotify", "nss", "libxss", "libxtst", "at-spi2-core"]
+    },
+    "deb": {
+      "depends": ["libgtk-3-0", "libnotify4", "libnss3", "libxss1", "libxtst6", "libatspi2.0-0"]
     }
   },
   "devDependencies": {
     "electron": "43.4.1",
-    "electron-builder": "26.15.3"
+    "electron-builder": "26.15.3",
+    "typescript": "^5.7.3",
+    "@types/node": "^22.10.5"
   }
 }

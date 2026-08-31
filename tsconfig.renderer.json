@@ -1,0 +1,18 @@
+{
+  // Config for the renderer: it's loaded via a plain <script src="renderer.js">
+  // tag in a browser context (nodeIntegration: false), so it must NOT be
+  // compiled as a CommonJS module - there is no `exports` object there.
+  // "module": "none" keeps this a plain script with no module wrapper.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "none",
+    // "resolveJsonModule" requires a real module system and errors out
+    // under "module: none".
+    "resolveJsonModule": false,
+    // Browser context - no Node.js globals (process, require, etc.) here.
+    "types": [],
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/renderer/**/*.ts"]
+}

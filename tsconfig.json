@@ -1,0 +1,13 @@
+{
+  // Not used directly by the build (see tsconfig.main.json /
+  // tsconfig.renderer.json) - this just gives editors/IDEs one config that
+  // covers the whole src/ tree for intellisense and inline type-checking.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "node16",
+    "moduleResolution": "node16",
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"]
+}
