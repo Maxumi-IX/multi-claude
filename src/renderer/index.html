@@ -12,7 +12,7 @@
       </div>
 
       <div class="controls-container">
-        <!-- profile switcher dropdown -->
+        <!-- profile switcher dropdown: click a profile for the main view, its split button for the second view -->
         <div class="relative">
           <button id="profile-btn" class="no-drag">
             <span id="current-profile">Default</span>
@@ -132,7 +132,7 @@
                   alt="App icon"
                 />
                 <h4 class="about-title">Multi Claude Desktop</h4>
-                <p class="about-version">Version 1.0.1</p>
+                <p class="about-version">Version 1.0.2</p>
                 <p class="about-desc">
                   Run multiple isolated Claude sessions side by side, each with
                   its own signed-in account and storage partition.
@@ -171,7 +171,7 @@
       </div>
     </div>
 
-    <!-- active profile's webview gets mounted in here -->
+    <!-- main webview (and the split one, if open) get mounted in here -->
     <div id="webview-container"></div>
 
     <script src="renderer.js"></script>
