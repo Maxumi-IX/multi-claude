@@ -38,7 +38,6 @@ const avatarPickerInitial = requireEl<HTMLElement>("avatar-picker-initial");
 const avatarFileInput = requireEl<HTMLInputElement>("avatar-file-input");
 
 const webviewContainer = requireEl<HTMLDivElement>("webview-container");
-let activeProfileId: string | null = null;
 
 // null = we're creating a new profile, otherwise holds the id being edited
 let editingProfileId: string | null = null;
@@ -55,15 +54,13 @@ document.addEventListener("click", (event) => {
     !profileBtn.contains(event.target as Node) &&
     !profilePopup.contains(event.target as Node)
   ) {
-    profilePopup.classList.add("hidden");
-    profileBtn.classList.remove("open");
+    closeProfilePopup();
   }
 });
 
 settingsBtn.onclick = () => {
   settingsModal.classList.toggle("hidden");
-  profilePopup.classList.add("hidden");
-  profileBtn.classList.remove("open");
+  closeProfilePopup();
   if (!settingsModal.classList.contains("hidden")) {
     // always open fresh on the list view, not whatever was last showing
     resetProfileForm();
@@ -225,7 +222,7 @@ profileFormSave.onclick = async () => {
     await loadProfiles();
 
     const newProfile = updatedProfiles[updatedProfiles.length - 1];
-    mountWebview(newProfile.id, newProfile.name);
+    setMainProfile(newProfile.id);
     settingsModal.classList.add("hidden");
   } else {
     await window.electronAPI.editProfile(
@@ -233,7 +230,7 @@ profileFormSave.onclick = async () => {
       name,
       pendingAvatarDataUrl,
     );
-    if (activeProfileId === editingProfileId) {
+    if (primaryProfileId === editingProfileId) {
       currentProfileLabel.textContent = name;
     }
     resetProfileForm();
@@ -247,31 +244,199 @@ profileFormName.addEventListener("keypress", (e) => {
   if (e.key === "Enter") profileFormSave.click();
 });
 
-// swaps out the webview for the given profile's session/partition
-function mountWebview(profileId: string, profileName: string): void {
-  if (activeProfileId === profileId) return; // already on this one, nothing to do
+// ---------------------------------------------------------------------------
+// Split view: the main view (picked from the title bar dropdown, same as
+// always) plus an optional second view on its right. The second view is chosen
+// with the split button next to each profile in the dropdown.
+//
+// The main pane is never moved or recreated when the split opens/closes -
+// detaching a <webview> reloads the page inside it, which would throw away
+// whatever you were in the middle of.
+// ---------------------------------------------------------------------------
+const MIN_PANE_WIDTH = 260;
 
-  webviewContainer.innerHTML = "";
+let profilesCache: Profile[] = [];
+let primaryProfileId: string | null = null;
+let splitProfileId: string | null = null;
+
+// A view = the pane element, the host the webview lives in, and a little
+// Chrome-style tab tucked into the page's bottom corner (only shown while
+// split) with the profile name and a close button.
+interface PaneView {
+  root: HTMLDivElement;
+  host: HTMLDivElement;
+  label: HTMLSpanElement;
+  closeBtn: HTMLButtonElement;
+}
+
+function createPaneView(): PaneView {
+  const root = document.createElement("div");
+  root.className = "pane";
+
+  const host = document.createElement("div");
+  host.className = "pane-host";
+
+  const tab = document.createElement("div");
+  tab.className = "pane-tab";
+  const label = document.createElement("span");
+  label.className = "pane-tab-label";
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "pane-tab-close";
+  closeBtn.type = "button";
+  closeBtn.title = "Close this view";
+  // drawn as an svg (not a text glyph) so it centers exactly, whatever font is in use
+  closeBtn.innerHTML =
+    '<svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">' +
+    '<path d="M1 1 L7 7 M7 1 L1 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" fill="none"/>' +
+    "</svg>";
+  tab.append(label, closeBtn);
+
+  root.append(host, tab);
+  return { root, host, label, closeBtn };
+}
+
+let mainPane = createPaneView();
+webviewContainer.appendChild(mainPane.root);
+let splitPane: PaneView | null = null;
+let splitDivider: HTMLDivElement | null = null;
+
+mainPane.closeBtn.onclick = () => closeMainPane();
+
+function closeProfilePopup(): void {
+  profilePopup.classList.add("hidden");
+  profileBtn.classList.remove("open");
+}
+
+// (re)creates the webview inside a pane for the given profile
+function mountIn(pane: PaneView, profileId: string): void {
+  pane.host.innerHTML = "";
   const wv = document.createElement("webview");
   wv.setAttribute("partition", `persist:${profileId}`); // this is what actually isolates login/cookies per profile
   wv.setAttribute("src", "https://claude.ai/chat");
-  wv.style.width = "100%";
-  wv.style.height = "100%";
+  pane.host.appendChild(wv);
+}
 
-  webviewContainer.appendChild(wv);
-  activeProfileId = profileId;
-  currentProfileLabel.textContent = profileName;
+function profileName(id: string | null): string {
+  return profilesCache.find((p) => p.id === id)?.name ?? id ?? "";
+}
 
-  localStorage.setItem("lastActiveProfileId", profileId);
+function updateTabLabels(): void {
+  mainPane.label.textContent = profileName(primaryProfileId);
+  if (splitPane) splitPane.label.textContent = profileName(splitProfileId);
+}
 
-  // update the checkmark on whichever profile is active in the dropdown
+// main/split highlights in the dropdown: checkmark + soft highlight = main, lit button = split
+function updateMenuHighlights(): void {
   document.querySelectorAll<HTMLElement>(".popup-item").forEach((item) => {
-    if (item.dataset.id === profileId) {
-      item.classList.add("active-item");
-    } else {
-      item.classList.remove("active-item");
-    }
+    const id = item.dataset.id;
+    item.classList.toggle("active-item", id === primaryProfileId);
+    item.classList.toggle("split-item", id === splitProfileId);
+    item
+      .querySelector(".split-item-btn")
+      ?.classList.toggle("on", id === splitProfileId);
   });
+  webviewContainer.classList.toggle("split-active", splitPane !== null);
+  updateTabLabels();
+}
+
+function setMainProfile(profileId: string): void {
+  if (primaryProfileId === profileId) return; // already on this one, nothing to do
+  const profile = profilesCache.find((p) => p.id === profileId);
+
+  mountIn(mainPane, profileId);
+  primaryProfileId = profileId;
+  currentProfileLabel.textContent = profile ? profile.name : profileId;
+  localStorage.setItem("lastActiveProfileId", profileId);
+  updateMenuHighlights();
+}
+
+// drag the divider to resize the two views
+function startResize(event: MouseEvent): void {
+  if (!splitPane || !splitDivider) return;
+  event.preventDefault();
+
+  const right = splitPane.root;
+  const left = mainPane.root;
+  const divider = splitDivider;
+  const startX = event.clientX;
+  const leftStart = left.getBoundingClientRect().width;
+  const rightStart = right.getBoundingClientRect().width;
+  const total = leftStart + rightStart;
+
+  webviewContainer.classList.add("resizing"); // stops the webviews swallowing mouse events
+  divider.classList.add("active");
+
+  const onMove = (e: MouseEvent) => {
+    let newLeft = leftStart + (e.clientX - startX);
+    newLeft = Math.max(
+      MIN_PANE_WIDTH,
+      Math.min(total - MIN_PANE_WIDTH, newLeft),
+    );
+    left.style.flexGrow = String(newLeft);
+    right.style.flexGrow = String(total - newLeft);
+  };
+  const onUp = () => {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    webviewContainer.classList.remove("resizing");
+    divider.classList.remove("active");
+  };
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+}
+
+// null closes the split view and leaves just the main view
+function setSplitProfile(profileId: string | null): void {
+  if (profileId === null) {
+    splitDivider?.remove();
+    splitPane?.root.remove();
+    splitDivider = null;
+    splitPane = null;
+    splitProfileId = null;
+    mainPane.root.style.flexGrow = "1";
+    localStorage.removeItem("splitProfileId");
+    updateMenuHighlights();
+    return;
+  }
+
+  if (!splitPane) {
+    splitDivider = document.createElement("div");
+    splitDivider.className = "pane-divider";
+    splitDivider.addEventListener("mousedown", startResize);
+    splitPane = createPaneView();
+    splitPane.closeBtn.onclick = () => setSplitProfile(null);
+    webviewContainer.append(splitDivider, splitPane.root);
+    mainPane.root.style.flexGrow = "1";
+  } else if (splitProfileId === profileId) {
+    return;
+  }
+
+  mountIn(splitPane, profileId);
+  splitProfileId = profileId;
+  localStorage.setItem("splitProfileId", profileId);
+  updateMenuHighlights();
+}
+
+// closing the left tab: the split view takes over as the main view. Its pane
+// is kept as-is (not re-mounted), so whatever you had open in it isn't reloaded.
+function closeMainPane(): void {
+  if (!splitPane || splitProfileId === null) return;
+
+  splitDivider?.remove();
+  mainPane.root.remove();
+
+  mainPane = splitPane;
+  splitPane = null;
+  splitDivider = null;
+  mainPane.closeBtn.onclick = () => closeMainPane();
+  mainPane.root.style.flexGrow = "1";
+
+  primaryProfileId = splitProfileId;
+  splitProfileId = null;
+  currentProfileLabel.textContent = profileName(primaryProfileId);
+  localStorage.setItem("lastActiveProfileId", primaryProfileId);
+  localStorage.removeItem("splitProfileId");
+  updateMenuHighlights();
 }
 
 // promise-based confirm dialog since we can't use the native confirm() with a frameless window
@@ -305,24 +470,49 @@ async function loadProfiles(): Promise<void> {
 
   profileList.innerHTML = "";
   settingsProfileList.innerHTML = "";
+  profilesCache = profiles;
 
   profiles.forEach((p) => {
-    // dropdown entry
+    // dropdown entry: click the row for the main view, the split button for the second view
     const div = document.createElement("div");
     div.dataset.id = p.id;
-    div.className = `popup-item ${p.id === activeProfileId ? "active-item" : ""}`;
-    div.innerHTML = `
-      ${avatarHtml(p, "profile-avatar")}
-      <span style="flex-grow: 1; margin-left: 8px;">${p.name}</span>
-      <span class="check-icon">✓</span>
-    `;
-    div.onclick = () => {
-      mountWebview(p.id, p.name);
-      profilePopup.classList.add("hidden");
-      profileBtn.classList.remove("open");
-    };
-    profileList.appendChild(div);
+    div.className = "popup-item";
 
+    // left part: the profile itself (main view)
+    const mainPart = document.createElement("div");
+    mainPart.className = "popup-item-main";
+    mainPart.innerHTML = avatarHtml(p, "profile-avatar");
+
+    const nameEl = document.createElement("span");
+    nameEl.style.cssText = "flex-grow: 1; margin-left: 8px;";
+    nameEl.textContent = p.name;
+    mainPart.appendChild(nameEl);
+
+    const check = document.createElement("span");
+    check.className = "check-icon";
+    check.textContent = "\u2713";
+    mainPart.appendChild(check);
+
+    mainPart.onclick = () => {
+      setMainProfile(p.id);
+      closeProfilePopup();
+    };
+
+    // right part: a separate button for the split view, lights up when this profile is split
+    const splitItemBtn = document.createElement("button");
+    splitItemBtn.className = "split-item-btn";
+    splitItemBtn.type = "button";
+    splitItemBtn.title = "Open in split view";
+    splitItemBtn.textContent = "\u25EB";
+    splitItemBtn.onclick = (e) => {
+      e.stopPropagation();
+      // clicking the one that's already split closes the split view
+      setSplitProfile(splitProfileId === p.id ? null : p.id);
+      closeProfilePopup();
+    };
+
+    div.append(mainPart, splitItemBtn);
+    profileList.appendChild(div);
     // settings tab card for the same profile
     const settingsItem = document.createElement("div");
     settingsItem.className = "settings-profile-card";
@@ -355,12 +545,10 @@ async function loadProfiles(): Promise<void> {
         );
         if (confirmDelete) {
           await window.electronAPI.deleteProfile(p.id);
-          if (activeProfileId === p.id) {
+          if (splitProfileId === p.id) setSplitProfile(null);
+          if (primaryProfileId === p.id) {
             // if you delete the profile you're currently on, bounce back to Default
-            const defaultProfile = profiles.find(
-              (prof) => prof.id === "Default",
-            )!;
-            mountWebview("Default", defaultProfile.name);
+            setMainProfile("Default");
           }
           await loadProfiles();
         }
@@ -372,12 +560,22 @@ async function loadProfiles(): Promise<void> {
     settingsProfileList.appendChild(settingsItem);
   });
 
-  // first load - restore whatever profile was active last time, or just fall back to the first one
-  if (profiles.length > 0 && !activeProfileId) {
+  if (primaryProfileId === null) {
+    // first load - restore whatever was active last time, or fall back to the first profile
     const savedId = localStorage.getItem("lastActiveProfileId");
     const profileToLoad = profiles.find((p) => p.id === savedId) || profiles[0];
-    mountWebview(profileToLoad.id, profileToLoad.name);
+    if (profileToLoad) setMainProfile(profileToLoad.id);
+
+    const savedSplit = localStorage.getItem("splitProfileId");
+    if (savedSplit && profiles.some((p) => p.id === savedSplit)) {
+      setSplitProfile(savedSplit);
+    }
+  } else {
+    // names/avatars may have changed
+    const main = profiles.find((p) => p.id === primaryProfileId);
+    if (main) currentProfileLabel.textContent = main.name;
   }
+  updateMenuHighlights();
 }
 
 resetProfileForm();

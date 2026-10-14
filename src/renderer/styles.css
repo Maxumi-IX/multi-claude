@@ -673,9 +673,157 @@ button:hover {
         WEBVIEW CONTAINER
    ============================== */
 #webview-container {
+  display: flex;
   height: calc(100vh - 45px);
   width: 100vw;
   background: #1e1e1e;
+}
+.pane {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.pane-host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.pane-host webview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* chrome-style tab tucked into the bottom corner of each page while split:
+   left view = bottom-left, right view = bottom-right. It sits flush in the corner
+   and only the opposite (inner top) corner is rounded, so it blends into the frame. */
+.pane-tab {
+  display: none;
+  position: absolute;
+  z-index: 10;
+  bottom: 0;
+  left: 0;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  max-width: 70%;
+  padding: 0 4px 0 12px;
+  box-sizing: border-box;
+  background: #1e1e1e;
+  border-radius: 0 10px 0 0;
+  font-size: 13px;
+}
+.split-active .pane-tab {
+  display: flex;
+}
+.pane:last-child .pane-tab {
+  left: auto;
+  right: 0;
+  padding: 0 12px 0 4px;
+  flex-direction: row-reverse;
+  border-radius: 10px 0 0 0;
+}
+.pane-tab-label {
+  display: block;
+  line-height: 1;
+  /* symmetric padding gives descenders (g, j, p, y) room so overflow: hidden doesn't clip them */
+  padding: 0.4em 0;
+  /* optical centering, measured from screenshots: names are mostly lowercase, so their visual
+     weight sits below the middle of the ascender-to-baseline range. Nudge up 2px in total so the
+     name reads as centered next to the close button. */
+  position: relative;
+  top: -2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pane-tab-close {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  color: var(--text-dim);
+  border-radius: 50%;
+}
+.pane-tab-close:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.12);
+}
+.pane-divider {
+  flex: none;
+  width: 5px;
+  cursor: col-resize;
+  background: #333;
+  transition: background 0.15s;
+}
+.pane-divider:hover,
+.pane-divider.active {
+  background: var(--accent-dim);
+}
+/* while dragging the divider, webviews would otherwise swallow the mouse events */
+#webview-container.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+#webview-container.resizing webview {
+  pointer-events: none;
+}
+
+/* each dropdown row = [profile (main view)] gap [split button] */
+.popup {
+  width: 210px;
+}
+.popup-item {
+  padding: 0;
+  gap: 4px;
+  align-items: stretch;
+  cursor: default;
+}
+.popup-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+/* selected main profile: brighter than idle, dimmer than hover so hover still reads */
+.popup-item.active-item {
+  background: #2f2f35;
+}
+/* hover covers the whole row, including the little gap before the split button */
+.popup-item:hover {
+  background: #3c3c44;
+}
+.split-item-btn {
+  flex: none;
+  width: 40px;
+  padding: 0;
+  border-radius: 0;
+  font-size: 16px;
+  color: var(--text-dim);
+  background: #2d2d30;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.split-item-btn:hover {
+  color: white;
+  background: #444;
+}
+/* lit up = this profile is the one in the split view */
+.split-item-btn.on,
+.split-item-btn.on:hover {
+  color: white;
+  background: var(--accent);
 }
 
 /* =============================
